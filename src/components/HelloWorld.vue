@@ -1,58 +1,162 @@
 <template>
-  <div class="hello">
-    <h1>{{ msg }}</h1>
-    <p>
-      For a guide and recipes on how to configure / customize this project,<br>
-      check out the
-      <a href="https://cli.vuejs.org" target="_blank" rel="noopener">vue-cli documentation</a>.
-    </p>
-    <h3>Installed CLI Plugins</h3>
-    <ul>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-babel" target="_blank" rel="noopener">babel</a></li>
-      <li><a href="https://github.com/vuejs/vue-cli/tree/dev/packages/%40vue/cli-plugin-eslint" target="_blank" rel="noopener">eslint</a></li>
-    </ul>
-    <h3>Essential Links</h3>
-    <ul>
-      <li><a href="https://vuejs.org" target="_blank" rel="noopener">Core Docs</a></li>
-      <li><a href="https://forum.vuejs.org" target="_blank" rel="noopener">Forum</a></li>
-      <li><a href="https://chat.vuejs.org" target="_blank" rel="noopener">Community Chat</a></li>
-      <li><a href="https://twitter.com/vuejs" target="_blank" rel="noopener">Twitter</a></li>
-      <li><a href="https://news.vuejs.org" target="_blank" rel="noopener">News</a></li>
-    </ul>
-    <h3>Ecosystem</h3>
-    <ul>
-      <li><a href="https://router.vuejs.org" target="_blank" rel="noopener">vue-router</a></li>
-      <li><a href="https://vuex.vuejs.org" target="_blank" rel="noopener">vuex</a></li>
-      <li><a href="https://github.com/vuejs/vue-devtools#vue-devtools" target="_blank" rel="noopener">vue-devtools</a></li>
-      <li><a href="https://vue-loader.vuejs.org" target="_blank" rel="noopener">vue-loader</a></li>
-      <li><a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">awesome-vue</a></li>
-    </ul>
-  </div>
+  <v-container>
+    <v-row class="text-center">
+      <v-col
+        class="d-flex"
+        cols="12"
+        sm="6"
+      >
+        <v-select
+          :items="items"
+          label="IPA O NACION"
+          v-model="check"
+          @change="cambioEstacion"
+          outlined
+        ></v-select>
+      </v-col>
+      <v-col
+        class="d-flex"
+        cols="12"
+        sm="6"
+        v-if="estacionesActuales != null"
+      >
+        <v-autocomplete
+        v-model="estacionSeleccionada"
+        :items="estacionesActuales"
+        color="white"
+        :item-text="itemText"
+        :item-value="itemValue"
+        label="Estación"
+        @change="eligioEstacion"
+        outlined
+        filled
+        solo
+      ></v-autocomplete>
+      </v-col>
+
+      <v-col cols="12" v-if="data.length < 1">
+        <v-skeleton-loader
+        class="mx-auto"
+        max-width="100%"
+        type="table"
+        :loading="true"
+        >
+        </v-skeleton-loader>
+      </v-col>  
+      <v-col cols="12" v-else>
+        <p class="font-weight-black" v-if="this.check == 'NACION'">
+          ULTIMA ACTUALIZACIÓN: {{ date }}
+        </p>
+        <p class="font-weight-black" v-if="this.check == 'IPA'">
+          ULTIMA ACTUALIZACIÓN: {{ data[0].fecha['date'] }}
+        </p>
+        <v-data-table
+          :headers="headers"
+          :items="data"
+          :items-per-page="5"
+          class="elevation-1"
+        >
+        </v-data-table>
+      </v-col>
+      
+    </v-row>
+  </v-container>
 </template>
 
 <script>
-export default {
-  name: 'HelloWorld',
-  props: {
-    msg: String
+import axios from 'axios';
+  export default {
+    name: 'HelloWorld',
+
+    data: () => ({
+      items: ['IPA','NACION'],
+      check: '',
+      estacionesActuales: null,
+      estacionSeleccionada: null,
+      headers: [],
+      data: [],
+      date: null,
+      itemText: 'nombre',
+      itemValue: 'idEstacion',
+    }),
+    methods: {
+      customFilter (item, queryText) {
+        const textOne = item.name.toLowerCase()
+        const textTwo = item.abbr.toLowerCase()
+        const searchText = queryText.toLowerCase()
+
+        return textOne.indexOf(searchText) > -1 ||
+          textTwo.indexOf(searchText) > -1
+      },
+      async cambioEstacion(e){
+        this.estacionesActuales = null
+        this.headers = [];
+        this.data = [];
+        if(e == 'IPA'){
+          this.itemText = 'nombre'
+          this.itemValue = 'idEstacion'
+          this.estacionesActuales = [
+          {
+            idEstacion: 56,
+            nombre: 'Gastre - Salina El Molle'
+          },
+          {
+            idEstacion: 57,
+            nombre: 'Estancia Tecka'
+          },
+          {
+            idEstacion: 58,
+            nombre: 'Lago Fontana'
+          },
+          {
+            idEstacion: 70,
+            nombre: 'Sierra Cuadrada'
+          }
+          ]
+        }
+        if(e == 'NACION'){
+          this.itemText = 'descripcion';
+          this.itemValue = 'idEquipo'
+          await axios
+          .get('https://ipaback.herokuapp.com/inta/Equipos')
+          .then(resp => {
+            this.estacionesActuales = resp.data;
+          });
+        }
+      },
+      async eligioEstacion(e){
+        if (this.check === 'IPA') {
+        await axios
+          .get('https://ipaback.herokuapp.com/ipa/' + e)
+          .then(resp => {
+            this.headers = [
+              { text: 'ID', value: 'Id' },
+              { text: 'Fecha', value: 'fecha[date]' },
+              { text: 'LLuvia', value: 'Lluvia' },
+              { text: 'Radiación solar', value: 'RadSolar' },
+              { text: 'Humedad', value: 'hum' },
+              { text: 'Presiòn barometrica', value: 'pBarom' },
+              { text: 'Temperatura', value: 'temp' },
+              { text: 'Direcciòn del viento', value: 'vDir' },
+              { text: 'Velocidad del viento', value: 'vVel' },
+            ];
+            this.data = resp.data.list;
+          });
+        }
+        if(this.check === 'NACION'){
+          await axios
+          .get('https://ipaback.herokuapp.com/inta/equipo/' + e)
+          .then(resp => {
+            this.headers = [
+              { text: 'Nombre sensor', value: 'nombreSensor' },
+              { text: 'Unidad', value: 'unidad' },
+              { text: 'Valor', value: 'valor' },
+            ];
+            this.data = resp.data.datosSensores;
+            this.date = resp.data.fechaUltimaActualizacionDatos;
+          });
+        }
+    }
   }
 }
 </script>
-
-<!-- Add "scoped" attribute to limit CSS to this component only -->
-<style scoped>
-h3 {
-  margin: 40px 0 0;
-}
-ul {
-  list-style-type: none;
-  padding: 0;
-}
-li {
-  display: inline-block;
-  margin: 0 10px;
-}
-a {
-  color: #42b983;
-}
-</style>
